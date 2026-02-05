@@ -6,8 +6,8 @@ import tempfile
 def download_audio(url):
     """
     Faz o download do áudio da URL fornecida e retorna o caminho do arquivo .mp3.
+    Adiciona cabeçalhos para evitar bloqueios de 'Video Unavailable'.
     """
-    # Criar um diretório temporário para o download
     temp_dir = tempfile.gettempdir()
     
     ydl_opts = {
@@ -20,12 +20,20 @@ def download_audio(url):
         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
+        # Opções para evitar bloqueios de servidores/bot detection
+        'nocheckcertificate': True,
+        'ignoreerrors': False,
+        'logtostderr': False,
+        'no_color': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'referer': 'https://music.youtube.com/',
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        # Tenta extrair informações primeiro
         info = ydl.extract_info(url, download=True)
-        # O yt-dlp muda a extensão para .mp3 após o post-processing
         filename = ydl.prepare_filename(info)
+        # O yt-dlp muda a extensão para .mp3 após o post-processing
         mp3_filename = os.path.splitext(filename)[0] + ".mp3"
         return mp3_filename, info.get('title', 'audio')
 
@@ -53,13 +61,11 @@ if url:
                             file_name=f"{title}.mp3",
                             mime="audio/mpeg"
                         )
-                    # Opcional: remover o arquivo temporário após carregar na memória
-                    # os.remove(file_path)
                 else:
                     st.error("Erro ao localizar o arquivo baixado.")
         except Exception as e:
             st.error(f"Ocorreu um erro: {str(e)}")
-            st.info("Dica: Verifique se a URL está correta e se o vídeo não possui restrições.")
+            st.info("Dica: O YouTube às vezes bloqueia acessos de servidores de nuvem. Tente uma URL diferente ou aguarde alguns minutos.")
 
 st.markdown("---")
 st.caption("Desenvolvido para uso pessoal. Respeite os direitos autorais.")

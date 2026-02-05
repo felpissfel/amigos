@@ -2,14 +2,21 @@ import streamlit as st
 import yt_dlp
 import os
 import tempfile
+import random
 
 def download_audio(url):
     """
-    Faz o download do áudio da URL fornecida e retorna o caminho do arquivo .mp3.
-    Adiciona cabeçalhos para evitar bloqueios de 'Video Unavailable'.
+    Faz o download do áudio com técnicas avançadas para evitar detecção de bot.
     """
     temp_dir = tempfile.gettempdir()
     
+    # Lista de User-Agents modernos para rotacionar ou usar um fixo robusto
+    user_agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    ]
+
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -20,52 +27,66 @@ def download_audio(url):
         'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
-        # Opções para evitar bloqueios de servidores/bot detection
+        
+        # --- ESTRATÉGIAS DE EVASÃO ---
+        'user_agent': random.choice(user_agents),
+        'referer': 'https://www.google.com/', # Simula vindo de uma busca
         'nocheckcertificate': True,
-        'ignoreerrors': False,
-        'logtostderr': False,
-        'no_color': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'referer': 'https://music.youtube.com/',
+        'geo_bypass': True,
+        'add_header': [
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Upgrade-Insecure-Requests: 1',
+        ],
+        # Força o uso de IPv4, pois IPv6 de data centers é bloqueado mais facilmente
+        'source_address': '0.0.0.0', 
+        # Tenta usar o extrator do Android que às vezes tem menos restrições
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web'],
+                'skip': ['dash', 'hls']
+            }
+        }
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        # Tenta extrair informações primeiro
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
-        # O yt-dlp muda a extensão para .mp3 após o post-processing
         mp3_filename = os.path.splitext(filename)[0] + ".mp3"
         return mp3_filename, info.get('title', 'audio')
 
-# Configuração da página Streamlit
-st.set_page_config(page_title="YouTube Music Downloader", page_icon="🎵")
+# Interface Streamlit
+st.set_page_config(page_title="YT Music Downloader PRO", page_icon="🎧")
 
-st.title("🎵 YouTube Music to MP3")
-st.markdown("Insira a URL do YouTube Music abaixo para baixar o áudio em formato .mp3.")
+st.title("🎧 YouTube Music Downloader")
+st.info("Nota: Se houver erro de 'Bot', tente clicar no botão novamente após alguns segundos.")
 
-# Input da URL
-url = st.text_input("URL do YouTube Music:", placeholder="https://music.youtube.com/watch?v=...")
+url = st.text_input("Cole a URL do YouTube Music:", placeholder="https://music.youtube.com/watch?v=...")
 
 if url:
     if st.button("Baixar / Download"):
         try:
-            with st.spinner("Processando o áudio... Isso pode levar alguns segundos."):
+            with st.spinner("Simulando acesso e processando áudio..."):
                 file_path, title = download_audio(url)
                 
                 if os.path.exists(file_path):
                     with open(file_path, "rb") as f:
-                        st.success(f"Pronto! '{title}' foi processado com sucesso.")
+                        st.success(f"Sucesso! '{title}' pronto para download.")
                         st.download_button(
-                            label="Clique aqui para salvar o arquivo",
+                            label="📥 Salvar MP3",
                             data=f,
                             file_name=f"{title}.mp3",
                             mime="audio/mpeg"
                         )
                 else:
-                    st.error("Erro ao localizar o arquivo baixado.")
+                    st.error("Arquivo não encontrado após o processamento.")
         except Exception as e:
-            st.error(f"Ocorreu um erro: {str(e)}")
-            st.info("Dica: O YouTube às vezes bloqueia acessos de servidores de nuvem. Tente uma URL diferente ou aguarde alguns minutos.")
+            error_msg = str(e)
+            if "confirm you're not a bot" in error_msg:
+                st.error("O YouTube detectou o servidor como um bot. 🤖")
+                st.warning("Dica: Tente clicar no botão novamente. Às vezes, a rotação de identidade funciona na segunda tentativa.")
+            else:
+                st.error(f"Erro: {error_msg}")
 
 st.markdown("---")
-st.caption("Desenvolvido para uso pessoal. Respeite os direitos autorais.")
+st.caption("Ferramenta de conversão para fins educacionais.")

@@ -5,7 +5,7 @@ import tempfile
 
 def download_audio(url):
     """
-    Faz o download do áudio simulando um cliente móvel.
+    Tenta baixar o áudio usando o cliente 'tv', que é o mais resiliente contra bloqueios de bot.
     """
     temp_dir = tempfile.gettempdir()
     
@@ -20,16 +20,13 @@ def download_audio(url):
         'quiet': True,
         'no_warnings': True,
         
-        # --- ESTRATÉGIA DE CLIENTE MÓVEL ---
+        # --- ESTRATÉGIA DE CLIENTE TV ---
+        # O cliente 'tv' (YouTube on TV) é o que menos exige desafios de bot atualmente
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'android'],
-                'player_skip': ['webpage', 'configs'],
+                'player_client': ['tv'],
             }
         },
-        
-        # User-agent de iPhone para maior compatibilidade
-        'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
         
         'nocheckcertificate': True,
         'geo_bypass': True,
@@ -45,22 +42,17 @@ def download_audio(url):
 st.set_page_config(page_title="YT Music Downloader", page_icon="🎵")
 
 st.title("🎵 YouTube Music Downloader")
-st.markdown("Insira a URL do YouTube Music para baixar o áudio.")
-
-# Forma segura de verificar segredos sem causar erro
-try:
-    if "YOUTUBE_COOKIES" in st.secrets:
-        st.sidebar.success("✅ Cookies configurados (Privado)")
-except Exception:
-    # Se st.secrets não estiver disponível ou o arquivo não existir, não faz nada
-    pass
+st.markdown("""
+Esta ferramenta tenta baixar áudios do YouTube Music. 
+*Nota: Servidores de nuvem (como o Streamlit Cloud) são frequentemente bloqueados pelo YouTube.*
+""")
 
 url = st.text_input("URL do YouTube Music:", placeholder="https://music.youtube.com/watch?v=...")
 
 if url:
     if st.button("Baixar / Download"):
         try:
-            with st.spinner("Processando áudio..."):
+            with st.spinner("Tentando bypass via protocolo de TV..."):
                 file_path, title = download_audio(url)
                 
                 if os.path.exists(file_path):
@@ -76,9 +68,18 @@ if url:
                     st.error("Erro ao localizar o arquivo.")
         except Exception as e:
             error_msg = str(e)
-            st.error(f"Erro: {error_msg}")
+            st.error("❌ O YouTube bloqueou esta tentativa.")
+            
             if "bot" in error_msg.lower() or "sign in" in error_msg.lower():
-                st.warning("O YouTube bloqueou o servidor. Tente novamente em alguns minutos ou use uma URL diferente.")
+                st.warning("""
+                **Por que falhou?** O YouTube identificou que este app está rodando em um servidor (Streamlit Cloud) e não em um computador pessoal.
+                
+                **Como resolver?**
+                1. **Rodar Localmente**: Baixe este código e rode no seu PC. No seu IP residencial, ele funcionará perfeitamente.
+                2. **Cookies**: A única forma de rodar na nuvem é usando cookies (o que você preferiu evitar por segurança).
+                """)
+                with st.expander("Ver erro técnico"):
+                    st.code(error_msg)
 
 st.markdown("---")
-st.caption("Desenvolvido com foco em segurança e simplicidade.")
+st.caption("Se o erro persistir, a melhor solução é a execução local.")
